@@ -119,7 +119,7 @@ def align_and_split_data(price, simdata, AR_forecasts, LEAR_forecasts, perfect_f
 
     return train, test
 
-def hypertuning(trial, traindata, testdata, simdata, algo="DQN"):
+def hypertuning(trial, traindata, testdata, simdata, algo="DQN", sellratio=1.0):
     from DQN import train_and_test_dqn
     from PPOd import train_and_test_PPOd
     from PPOc import train_and_test_PPOc
@@ -134,19 +134,21 @@ def hypertuning(trial, traindata, testdata, simdata, algo="DQN"):
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-4, 1e-3)
         batch_size = trial.suggest_categorical("batch_size", [64, 128])
         gamma = trial.suggest_uniform("gamma", 0.90, 0.999)
-        timesteps = trial.suggest_int("timesteps", 50000, 200000)
+        # timesteps = trial.suggest_int("timesteps", 50000, 200000)
+        timesteps = 115000
         try:
             _, _, _, _, savings_pct = train_and_test_dqn(
                 train=traindata,
                 test=testdata,
                 simdata=simdata,
                 forecast_type="LEAR",
-                sell_price_ratio=1.0,
+                sell_price_ratio=sellratio,
                 load_existing_model=False,
                 timesteps=timesteps,
                 learning_rate=learning_rate,
                 batch_size=batch_size,
-                gamma=gamma
+                gamma=gamma,
+                evaluation = True
             )
             return savings_pct
         except Exception as e:
@@ -159,21 +161,23 @@ def hypertuning(trial, traindata, testdata, simdata, algo="DQN"):
         gamma = trial.suggest_uniform("gamma", 0.90, 0.999)
         gae_lambda = trial.suggest_uniform("gae_lambda", 0.90, 1.0)
         n_steps = trial.suggest_int("n_steps", 32, 1024)
-        timesteps = trial.suggest_int("timesteps", 200_000, 2_000_000, step=200_000)
+        # timesteps = trial.suggest_int("timesteps", 200_000, 2_000_000, step=200_000)
+        timesteps = 1400000
         try:
             _, _, _, _, savings_pct = train_and_test_PPOd(
                 train=traindata,
                 test=testdata,
                 simdata=simdata,
                 forecast_type="LEAR",
-                sell_price_ratio=1.0,
+                sell_price_ratio=sellratio,
                 load_existing_model=False,
                 learning_rate=learning_rate,
                 batch_size=batch_size,
                 gamma=gamma,
                 gae_lambda=gae_lambda,
                 n_steps=n_steps,
-                total_timesteps=timesteps
+                total_timesteps=timesteps,
+                evaluation = True
             )
             return savings_pct
         except Exception as e:
@@ -187,21 +191,23 @@ def hypertuning(trial, traindata, testdata, simdata, algo="DQN"):
         gamma = trial.suggest_uniform("gamma", 0.90, 0.999)
         gae_lambda = trial.suggest_uniform("gae_lambda", 0.90, 1.0)
         n_steps = trial.suggest_int("n_steps", 32, 1024)
-        timesteps = trial.suggest_int("timesteps", 200_000, 2_000_000, step=200_000)
+        # timesteps = trial.suggest_int("timesteps", 200_000, 2_000_000, step=200_000)
+        timesteps = 1800000
         try:
             _, _, _, _, savings_pct = train_and_test_PPOc(
                 train=traindata,
                 test=testdata,
                 simdata=simdata,
                 forecast_type="LEAR",
-                sell_price_ratio=1.0,
+                sell_price_ratio=sellratio,
                 load_existing_model=False,
                 learning_rate=learning_rate,
                 batch_size=batch_size,
                 gamma=gamma,
                 gae_lambda=gae_lambda,
                 n_steps=n_steps,
-                total_timesteps=timesteps
+                total_timesteps=timesteps,
+                evaluation = True
             )
             return savings_pct
         except Exception as e:
@@ -212,20 +218,21 @@ def hypertuning(trial, traindata, testdata, simdata, algo="DQN"):
         batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
         gamma = trial.suggest_uniform("gamma", 0.90, 0.999)
         tau = trial.suggest_loguniform("tau", 1e-5, 1e-2)
-        timesteps = 200000  # Fixed for SAC, can be tuned if needed
+        timesteps = 500000  # Fixed for SAC, can be tuned if needed
         try:
             _, _, _, _, savings_pct = train_and_test_SAC(
                 train=traindata,
                 test=testdata,
                 simdata=simdata,
                 forecast_type="LEAR",
-                sell_price_ratio=1.0,
+                sell_price_ratio=sellratio,
                 load_existing_model=False,
                 learning_rate=learning_rate,
                 batch_size=batch_size,
                 gamma=gamma,
                 tau=tau,
-                total_timesteps=timesteps
+                total_timesteps=timesteps,
+                evaluation = True
             )
             return savings_pct
         except Exception as e:

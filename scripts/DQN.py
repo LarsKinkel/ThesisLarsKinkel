@@ -3,13 +3,15 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import ProgressBarCallback
 from stable_baselines3.common.vec_env import VecFrameStack
+from stable_baselines3.common.monitor import Monitor
+import os
 
 from BatteryEnv import BatteryEnv # Import  custom environment
 
 def train_and_test_dqn(
     train, test, simdata, forecast_type, sell_price_ratio=1.0, SEED=2025,
     model_save_path=None, load_existing_model=False, model_load_path=None,
-    timesteps=50000, learning_rate=5e-4, batch_size=64, gamma=0.99
+    timesteps=50000, learning_rate=5e-4, batch_size=64, gamma=0.99, monitor=False, evaluation = False
 ):
     """
     Trains and tests a DQN agent on the provided train/test splits.
@@ -26,14 +28,29 @@ def train_and_test_dqn(
         "LEAR": "LEAR"
     }[forecast_type]
 
-    # Create training environment
-    train_env = BatteryEnv(
-        train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
-        battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
-        discrete_actions=True, sell_price_ratio=sell_price_ratio)
+    if monitor == True:
+        log_dir = "./logs"
+        os.makedirs(log_dir, exist_ok=True)
+        monitor_filename = f"{log_dir}/DQN_{forecast_type}_monitor.csv"
 
-    # Wrap the environment for compatibility with Stable-Baselines3
-    vec_train_env = make_vec_env(lambda: train_env, n_envs=1, seed=SEED)
+        def make_monitored_train_env():
+            env = BatteryEnv(
+                train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
+                battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
+                discrete_actions=True, sell_price_ratio=sell_price_ratio)
+            return Monitor(env, filename=monitor_filename)
+
+        # Wrap the environment for compatibility with Stable-Baselines3
+        vec_train_env = make_vec_env(lambda: make_monitored_train_env(), n_envs=1, seed=SEED)
+    else:
+        # Create training environment without monitoring
+        train_env = BatteryEnv(
+            train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
+            battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
+            discrete_actions=True, sell_price_ratio=sell_price_ratio)
+        
+        vec_train_env = make_vec_env(lambda: train_env, n_envs=1, seed=SEED)
+
     stacked_train_env = VecFrameStack(vec_train_env, n_stack=4)  # Stack 4 frames
 
     if load_existing_model and model_load_path is not None:
@@ -94,12 +111,15 @@ def train_and_test_dqn(
 
     df_rl_result_2024 = df_rl_result_test.loc["2024-01-01 00:00:00":"2024-12-31 23:00:00"]
 
-    # Evaluate RL results
-    no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct = evaluate_strategy(
-        df_full=simdata,
-        df_battery_result=df_rl_result_2024,
-        start="2024-01-01",
-        end="2024-12-31 23:00"
-    )
+    if evaluation:
+        # Evaluate RL results
+        no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct = evaluate_strategy(
+            df_full=simdata,
+            df_battery_result=df_rl_result_2024,
+            start="2024-01-01",
+            end="2024-12-31 23:00"
+        )
+    else:
+        no_batt_curve_rl = batt_profit_curve_rl = savings_rl = savings_pct = None
 
     return df_rl_result_2024, no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct

@@ -3,6 +3,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import ProgressBarCallback
 from stable_baselines3.common.vec_env import VecFrameStack
+from stable_baselines3.common.monitor import Monitor
+import os
 
 from BatteryEnv import BatteryEnv
 from helpers import evaluate_strategy
@@ -11,7 +13,8 @@ def train_and_test_PPOc(
     train, test, simdata, forecast_type, sell_price_ratio=1.0, SEED=2025,
     model_save_path=None, load_existing_model=False, model_load_path=None,
     n_envs=8, n_stack=4,
-    learning_rate=3e-4, batch_size=256, gamma=0.99, gae_lambda=0.97, n_steps=336, total_timesteps=300_000
+    learning_rate=3e-4, batch_size=256, gamma=0.99, gae_lambda=0.97, n_steps=336, total_timesteps=300_000, 
+    monitor = False, evaluation = False
 ):
     """
     Trains and tests a PPO agent (continuous actions) on the provided train/test splits.
@@ -24,14 +27,28 @@ def train_and_test_PPOc(
         "LEAR": "LEAR"
     }[forecast_type]
 
-    # Create vectorized and stacked training environment (continuous actions)
-    def make_env():
-        return BatteryEnv(
-            train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
-            battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
-            discrete_actions=False, sell_price_ratio=sell_price_ratio
-        )
-    vec_train_env = make_vec_env(make_env, n_envs=n_envs, seed=SEED)
+    if monitor:
+        log_dir = "./logs"
+        os.makedirs(log_dir, exist_ok=True)
+        monitor_filename = f"{log_dir}/PPOc_{forecast_type}_monitor.csv"
+
+        def make_monitored_env():
+            env = BatteryEnv(
+                train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
+                battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
+                discrete_actions=False, sell_price_ratio=sell_price_ratio
+            )
+            return Monitor(env, filename=monitor_filename)
+        vec_train_env = make_vec_env(lambda: make_monitored_env(), n_envs=n_envs, seed=SEED)
+    else:
+        def make_env():
+            return BatteryEnv(
+                train["prices"], train[forecast_col], train["generation"], train["demand"], train["weather"],
+                battery_capacity=200.0, charge_limit=100.0, discharge_limit=100.0, efficiency=0.98, initial_soc=0,
+                discrete_actions=False, sell_price_ratio=sell_price_ratio
+            )
+        vec_train_env = make_vec_env(make_env, n_envs=n_envs, seed=SEED)
+
     stacked_train_env = VecFrameStack(vec_train_env, n_stack=n_stack)
 
     if load_existing_model and model_load_path is not None:
@@ -102,12 +119,16 @@ def train_and_test_PPOc(
 
     df_rl_result_2024 = df_rl_result_test.loc["2024-01-01 00:00:00":"2024-12-31 23:00:00"]
 
-    # Evaluate RL results
-    no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct = evaluate_strategy(
-        df_full=simdata,
-        df_battery_result=df_rl_result_2024,
-        start="2024-01-01",
-        end="2024-12-31 23:00"
-    )
+    if evaluation:
+        # Evaluate RL results
+        no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct = evaluate_strategy(
+            df_full=simdata,
+            df_battery_result=df_rl_result_2024,
+            start="2024-01-01",
+            end="2024-12-31 23:00"
+        )
+    else:
+        no_batt_curve_rl = batt_profit_curve_rl = savings_rl = savings_pct = None
+
 
     return df_rl_result_2024, no_batt_curve_rl, batt_profit_curve_rl, savings_rl, savings_pct
