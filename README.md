@@ -30,7 +30,7 @@ BatteryRLThesis/
 - **`notebooks/`**  
   Contains the main and auxiliary Jupyter notebooks:
   - `ThesisNotebook.ipynb`: Final evaluation notebook combining forecasting and control.
-  Run this notebook to see how the results of the thesis are obtained. The notebook as it is in this repo will use only stored models and data, and will not train models or perform hyperparameter tuning, so running all cells will only take a few minutes. 
+  Run this notebook to see how the results of the thesis are obtained. The notebook as it is in this repo will use only stored models and data, and will not train models or perform hyperparameter tuning, so running all cells will only take a few minutes. Note that the output of the cells is also visible already in `ThesisNotebook.ipynb`
 
 - **`scripts/`**  
   Modular Python scripts with key functionality:
