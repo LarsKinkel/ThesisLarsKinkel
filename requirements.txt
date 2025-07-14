@@ -1,0 +1,11 @@
+gymnasium
+matplotlib
+numpy
+optuna
+pandas
+scikit-learn
+seaborn
+statsmodels
+stable-baselines3
+torch
+tqdm
